@@ -1,0 +1,86 @@
+#Load Libraries
+library(tidyr)
+library(dplyr)
+library(summarytools)
+library(stats)
+library(ggplot2)
+library(factoextra)
+library(scales)
+library(cluster)
+library(fpc)
+
+#Change R Options
+options(scipen = 999)
+options(digits = 12)
+memory.limit(size = 200000)
+memory.size(max = FALSE)
+
+##Subset Bucketing
+#Count of Volume per Client ID
+VolumePerClient = Compiled.All.Data %>% count(Client.ID, sort = TRUE)
+
+#Identify Subset: Volume Range 10,000 to 15,000 (Low)
+ClientSubset <- subset(VolumePerClient, n >= 10000 & n <= 15000)
+
+#Select Subset
+Compiled.Subset.Data = Compiled.All.Data %>% filter(Client.ID %in% ClientSubset$Client.ID)
+
+#Create Subset File
+write.csv(Compiled.Subset.Data,"C:/Users/tiz6/OneDrive/Documents/Utica - MSDS/Class 11 - Spring 2021 D2 - Capstone/BNYM Data/Compiled Low Volume Subset Data", row.names= FALSE)
+
+#Create Volume Per Client File
+write.csv(VolumePerClient,"C:/Users/tiz6/OneDrive/Documents/Utica - MSDS/Class 11 - Spring 2021 D2 - Capstone/BNYM Data/Volume Per Client", row.names= FALSE)
+
+##Data Pre-processing
+#Complete Subset
+Compiled.Low.Volume.Subset.Data$TRANSACTION.TIME <- strptime(Compiled.Low.Volume.Subset.Data$TRANSACTION.TIME, format = '%Y-%m-%d %H:%M:%S')
+
+Compiled.Low.Volume.Subset.Data$SWIFT.MSG.TYPE[Compiled.Low.Volume.Subset.Data$SWIFT.MSG.TYPE == 103] <- 0 
+Compiled.Low.Volume.Subset.Data$SWIFT.MSG.TYPE[Compiled.Low.Volume.Subset.Data$SWIFT.MSG.TYPE == 202] <- 1
+Compiled.Low.Volume.Subset.Data$SWIFT.MSG.TYPE <- as.numeric(Compiled.Low.Volume.Subset.Data$SWIFT.MSG.TYPE)
+
+#Single Client
+CLIENT.ID.7116516696$TRANSACTION.TIME <- strptime(CLIENT.ID.7116516696$TRANSACTION.TIME, format = '%Y-%m-%d %H:%M:%S')
+
+CLIENT.ID.7116516696$SWIFT.MSG.TYPE[CLIENT.ID.7116516696$SWIFT.MSG.TYPE == 103] <- 0 
+CLIENT.ID.7116516696$SWIFT.MSG.TYPE[CLIENT.ID.7116516696$SWIFT.MSG.TYPE == 202] <- 1
+CLIENT.ID.7116516696$SWIFT.MSG.TYPE <- as.numeric(CLIENT.ID.7116516696$SWIFT.MSG.TYPE)
+
+##Descriptive Statistics Analysis
+#Basic Statistics
+summary(Compiled.Low.Volume.Subset.Data)
+
+#Standard Deviations of Numerical Variable
+sd(Compiled.Low.Volume.Subset.Data$TRANSACTION.AMOUNT)
+
+#Frequency of Categorical Variables
+freq(Compiled.Low.Volume.Subset.Data$SWIFT.MSG.TYPE)
+freq(Compiled.Low.Volume.Subset.Data$COUNTRY)
+freq(Compiled.Low.Volume.Subset.Data$COUNTRY, order = "freq")
+
+###Machine Learning Models
+
+#Single Client with Transaction Amount and SWIFT Type
+df.client.amount.type <- CLIENT.ID.7116516696[, c("TRANSACTION.AMOUNT", "SWIFT.MSG.TYPE")]
+
+##k-Means Clusters 
+
+#Estimate Optimal k Clusters
+fviz_nbclust(df.client.amount.type, kmeans, method = "wss") + geom_vline(xintercept = 3, linetype = 2) + scale_y_continuous(label = label_scientific(digits = 3))
+
+#Compute k-Means Model with k = 3
+km.client <- kmeans(df.client.amount.type, 3, iter.max = 20, nstart = 50)
+print(km.client)
+
+#Visualize k-Means Clusters
+fviz_cluster(km.client, df.client.amount.type, show.clust.center = TRUE, main = "Single Client k-Means Cluster Plot with k = 3", xlab = "Transaction Amount (USD)", ylab = "SWIFT Message Type", geom = "point")
+
+##k-Medoids Clusters
+
+#Estimate Optimal k Clusters
+fviz_nbclust(df.client.amount.type, pam, method = "silhouette", k.max = 6)
+
+#Computer k-Medoids Model under PAM with k = 2 
+pam.client <- pam(df.client.amount.type, 2) 
+print(pam.client)
+plot(pam.client, xlab = "Transaction Amount (USD)", ylab = "SWIFT Message Type")
