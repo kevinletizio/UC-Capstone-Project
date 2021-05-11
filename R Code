@@ -84,3 +84,7 @@ fviz_nbclust(df.client.amount.type, pam, method = "silhouette", k.max = 6)
 pam.client <- pam(df.client.amount.type, 2) 
 print(pam.client)
 plot(pam.client, xlab = "Transaction Amount (USD)", ylab = "SWIFT Message Type")
+
+#Assign Clusters to Dataset
+CLIENT.ID.7116516696 <- cbind(CLIENT.ID.7116516696, pam.client$cluster)
+
